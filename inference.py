@@ -4,11 +4,6 @@ import torch
 from dataloader import *
 from args import *
 
-#################################################################################################
-#                                                                                               #
-# TODO : save 한 model parameter 를 load 하여 test set 에서 성능을 확인해봅시다.                #
-#                                                                                               #
-#################################################################################################
 device="cuda"
 path = "/content/drive/MyDrive/Colab Notebooks/pth_path/log_epoch_7.pth"
 

@@ -1,18 +1,18 @@
 import torch
 import torch.nn as nn
 import time
+import os
+from custom_lr_scheduler import *
+from args import *
+import numpy as np
+from model import seg_model
+import matplotlib.pyplot as plt
+from dataloader import *
 
 class Semantic_Seg_Trainer(nn.Module):
     def __init__(self, model, opt="adam", num_class=2, lr=0.0001, has_scheduler=False, device="cpu", log_dir="./logs",
                  max_epoch=20):
-        """
-          Args:
-            model: 사용할 model
-            opt: optimizer
-            lr: learning rate
-            has_scheduler: learning rate scheduler 사용 여부
-            device: 사용할 device (cpu/cuda)
-        """
+
         super().__init__()
 
         self.max_epoch = max_epoch
@@ -31,11 +31,7 @@ class Semantic_Seg_Trainer(nn.Module):
         if not os.path.exists(log_dir): os.makedirs(log_dir)
 
     def _get_optimizer(self, opt, lr=0.001):
-        """
-          Args:
-            opt: optimizer
-            lr: learning rate
-        """
+
         if opt == "sgd":
             self.optimizer = torch.optim.SGD(params=self.model.parameters(), lr=lr)
         elif opt == "adam":
@@ -51,15 +47,7 @@ class Semantic_Seg_Trainer(nn.Module):
                                                        eta_max=Args["eta_min"], T_up=2, gamma=0.3)
 
     def train(self, train_loader, valid_loader, max_epochs=20, disp_epoch=1, visualize=False):
-        """
-          네트워크를 학습시키는 함수
-          Args:
-            train_loader: 학습에 사용할 train dataloader
-            valid_loader: validation에 사용할 dataloader
-            max_epochs: 학습을 진행할 총 epoch 수
-            disp_epochs: 학습 log를 display 할 epoch 주기
-            visualize: 학습 진행 과정에서 결과 이미지를 visualize
-        """
+
         print("===== Train Start =====")
         start_time = time.time()
         history = {"train_loss": [], "valid_loss": [], "train_miou": [], "valid_miou": []}
@@ -87,21 +75,9 @@ class Semantic_Seg_Trainer(nn.Module):
             self.save_statedict(save_name=f"log_epoch_{e}")
             self.plot_history(history, save_name=f"{self.log_dir}/log_epoch_{e}.png")  # 그래프 출력
 
-            #################################################################################################
-            #                                                                                               #
-            # TODO : 한 epoch 의 학습이 끝날때 마다 model 을 save 하는 코드를 작성해봅시다.                 #
-            #        graph 저장 코드를 참고하여 저장되는 model 의 이름에 몇 epoch 인지 나타나게 해봅시다.   #
-            #                                                                                               #
-            #################################################################################################
 
     def _train_epoch(self, train_loader, disp_step=10):
-        """
-          model를 training set 한 epoch 만큼 학습시키는 함수
-          Args:
-            train_loader: 학습에 사용할 train dataloader
-          Returns:
-            training set 한 epoch의 평균 loss, 평균 accuracy
-        """
+
         epoch_loss = 0
 
         miou = 0
@@ -153,13 +129,7 @@ class Semantic_Seg_Trainer(nn.Module):
         return epoch_loss, epoch_miou
 
     def _valid_epoch(self, valid_loader, disp_step=10):
-        """
-          현재 model의 성능을 validation set에서 측정하는 함수
-          Args:
-            valid_loader: 학습에 사용할 valid dataloader
-          Returns:
-            validation set 의 평균 loss, 평균 accuracy
-        """
+
         epoch_loss = 0
 
         miou = 0
@@ -210,12 +180,7 @@ class Semantic_Seg_Trainer(nn.Module):
             torch.save(seg_model.state_dict(), "/content/drive/MyDrive/Colab Notebooks/pth_path/" + save_name + ".pth")
 
     def plot_history(self, history, save_name=None):
-        """
-          history에 저장된 model의 성능을 graph로 plot
-          Args:
-            history: dictionary with keys {"train_loss","valid_loss",  }
-                     각 item 들은 epoch 단위의 성능 history의 list
-        """
+
         fig = plt.figure(figsize=(16, 8))
 
         ax = fig.add_subplot(1, 2, 1)
@@ -236,13 +201,7 @@ class Semantic_Seg_Trainer(nn.Module):
             plt.savefig(save_name)
 
     def test(self, test_loader):
-        """
-          현재 model의 성능을 test set에서 측정하는 함수
-          Args:
-            test_loader: 학습에 사용할 test dataloader
-          Returns:
-            test set 의 평균 loss, 평균 accuracy
-        """
+
         print("===== Test Start =====")
         start_time = time.time()
         epoch_loss = 0
@@ -289,9 +248,6 @@ class Semantic_Seg_Trainer(nn.Module):
             f"Test loss: {epoch_loss:>6f}, miou: {epoch_miou:>6f}, iou_back : {iou_back:>6f}, iou_scratch : {iou_scratch:>6f}, time: {time.time() - epoch_start_time:>3f}")
 
     def batch_segmentation_iou(self, outputs, labels):
-        """
-            outputs, labels : (batch, h, w)
-        """
 
         SMOOTH = 1e-6
 
@@ -299,15 +255,6 @@ class Semantic_Seg_Trainer(nn.Module):
         union = (outputs | labels).float().sum((1, 2))  # Will be zero if both are 0
 
         iou = (intersection + SMOOTH) / (union + SMOOTH)  # union = A+b - intersection
-
-        #################################################################################################
-        #                                                                                               #
-        # TODO : 위 코드를 보고 IoU 를 계산하는 코드를 만들어봅시다.                                    #
-        # hint : 나누기에서 0으로 나누면 error 가 발생하기 때문에 이를 피하기 위해 분자와 분모에        #
-        #        아주 작은 수인 SMOOTH 를 더해줍시다                                                    #
-        #        ex) x / y   --->   (x + SMOOTH) / (y + SMOOTH)                                         #
-        #                                                                                               #
-        #################################################################################################
 
         return torch.sum(iou).to("cpu").numpy()
 
